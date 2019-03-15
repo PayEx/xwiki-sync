@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<page xmlns="http://www.xwiki.org">     
+        <title>Foo Page</title>
+        <syntax>xwiki/2.1</syntax>
+        <content>
+            This is a new page from the Node Service
+        </content>
+</page>
