@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <page xmlns="http://www.xwiki.org">     
         <title>Foo Page</title>
-        <syntax>xwiki/2.1</syntax>
+        <syntax>markdown/1.2</syntax>
         <content>
-            This is a new page from the Node Service
+# Foo Page
+This is a new page from the Node Service
+- list item 1
+- list item 2
+- list item 3
         </content>
 </page>
