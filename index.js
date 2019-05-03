@@ -8,18 +8,17 @@ let configuration = {
     url: null
 };
 
+console.log("\n Let's sync some documents...");
+console.log("------------------------------------------------------------");
+
 process.argv.forEach(function(argument, index){
     // Node path and script name is included in argv
-    if(index >= 2){ return; }
-
-    console.log(argument);
+    if(index <= 1){ return; }
 
     var argumentMatch = argument.match(/--([a-z]+)=(\S+)/);
 
-    console.log(argumentMatch);
-
     if(argumentMatch === null){
-        new Error("Invalid argument " + argument);
+        throw new Error("Invalid argument " + argument);
     }
 
     var argumentName = argumentMatch[1];
@@ -36,36 +35,36 @@ process.argv.forEach(function(argument, index){
             configuration.url = new URL(argumentValue)
             break;
         default:
-            new Error("Unrecognized argument " + argumentName + " with value " + argumentValue);
+            throw new Error("Unrecognized argument " + argumentName + " with value " + argumentValue);
     }
 });
 
 if(configuration.user === null){
-    new Error("Missing confiugration for user");
+    throw new Error("Missing confiugration for user");
 }
 
 if(configuration.password === null){
-    new Error("Missing confiugration for password");
+    throw new Error("Missing confiugration for password");
 }
 
 if(configuration.url === null){
-    new Error("Missing confiugration for url");
+    throw new Error("Missing confiugration for url");
 }
 
-console.log("Configuration");
+console.log("Configuration: ");
 console.log(configuration);
 
 var auth = Buffer.from(configuration.user + ":" + configuration.password).toString("base64"),
     fileName = "foo",
     fileExtension = "md",
-    wikiTitle = "foo-test-18",
+    wikiTitle = "foo-test-19",
     filePath = path.join(__dirname, fileName + "." + fileExtension);
 
 fs.readFile(filePath, { encoding: 'utf-8' }, function (error, data){
     var postRequest = http.request({
         hostname: configuration.url.hostname,
         port: configuration.url.port,
-        path: configuration.url.pathName + wikiTitle,
+        path: configuration.url.pathname + wikiTitle,
         method: "PUT",
         headers: {
             "Authorization": "Basic " +  auth,
@@ -75,7 +74,10 @@ fs.readFile(filePath, { encoding: 'utf-8' }, function (error, data){
     }, (res) => {
         res.setEncoding('utf8');
         res.on('data', function (chunk) {
-            console.log('Response: ' + chunk);
+            console.log('\n Response: ' + chunk);
+
+            console.log("\n Ok, I'm done. See you later alligator.");
+            console.log("------------------------------------------------------------");
         });
     });
     
@@ -90,4 +92,5 @@ fs.readFile(filePath, { encoding: 'utf-8' }, function (error, data){
 
     postRequest.end();
 });
+
 
