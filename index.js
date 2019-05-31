@@ -1,10 +1,15 @@
-var http = require("http"),
-    fs = require('fs'),
-    path = require('path');
+// var Git = require("nodegit");
 
-let configuration = {
+const http = require("http"),
+    fs = require('fs'),
+    path = require('path'),
+    util = require('util');
+    exec = util.promisify(require('child_process').exec);
+
+const configuration = {
     user: null,
     password: null,
+    source: null,
     url: null
 };
 
@@ -31,6 +36,9 @@ process.argv.forEach(function(argument, index){
         case "password":
             configuration.password = argumentValue;
             break;
+        case "source":
+            configuration.source = argumentValue;
+            break;
         case "wiki":
             configuration.url = new URL(argumentValue)
             break;
@@ -51,11 +59,57 @@ if(configuration.url === null){
     throw new Error("Missing confiugration for url");
 }
 
+if(configuration.source === null){
+    throw new Error("Missing confiugration for source");
+}
+
 console.log("Configuration: ");
 console.log(configuration);
 
-var auth = Buffer.from(configuration.user + ":" + configuration.password).toString("base64"),
-    fileName = "foo",
+var auth = Buffer.from(configuration.user + ":" + configuration.password).toString("base64");
+
+// console.log(configuration.url.pathname + "sync-log/");
+
+// const logRequest = http.request({
+//     hostname: configuration.url.hostname,
+//     port: configuration.url.port,
+//     path: configuration.url.pathname + "sync-log/",
+//     method: "GET",
+//     headers: {
+//         "Authorization": "Basic " +  auth,
+//         "Content-Type": "application/json",
+//         "Allow": "application/json"
+//     }
+// }, (res) => {
+//     res.setEncoding('utf8');
+//     res.on('data', function (chunk) {
+//         console.log('\n Response: ' + chunk);
+//     });
+// });
+
+// logRequest.end();
+
+async function getChangedFiles(){
+    const { stdout, stderr } = await exec("git diff --name-only ca63a7b 119d757 ./test-documents/");
+
+    if(stderr){
+        console.log('stdout:', stdout);
+        throw new Error("Crashed running diff, please review stdout above");
+    } 
+
+    const stdoutSplit = stdout.split(/\n/);
+    stdoutSplit.pop();
+
+    return stdoutSplit;
+}
+
+getChangedFiles().then(function(value){
+    console.log("Hello ");
+    console.log(value);
+});
+
+
+var fileName = "foo",
     fileExtension = "md",
     wikiTitle = "foo-test-19",
     filePath = path.join(__dirname, fileName + "." + fileExtension);
