@@ -88,17 +88,22 @@ async function run (){
         }
     }
 
-
-    console.log("lastedSyncedCommitId");
+    console.log("LastedSyncedCommitId: ");
     console.log(lastedSyncedCommitId);
 
-    // const changedDocments = await getChangedFiles(lastedSyncedCommitId);
+    const changedDocments = await getChangedFiles(lastedSyncedCommitId);
 
-    // console.log(changedDocments);
+    console.log("Changed documents");
+    console.log(changedDocments);
 
-
+    
 }
 
+async function syncDocuments(documents){
+    
+}
+
+// TODO: Abstract to git service
 async function getChangedFiles(commitId){
     if(!commitId){
         // https://stackoverflow.com/questions/40883798/how-to-get-git-diff-of-the-first-commit
@@ -113,11 +118,31 @@ async function getChangedFiles(commitId){
         throw new Error("Crashed running diff, please review stdout above");
     }
 
-    const stdoutSplit = stdout.split(/\n/);
-    stdoutSplit.pop();
+    const filePaths = stdout.split(/\n/);
+    filePaths.pop();
+    
+    let readFilePromises = [];
+    filePaths.forEach((filePath) => {
+        let readFilePromise = new Promise(function(resolve, reject) {
+            fs.readFile(filePath, { encoding: 'utf-8' }, function (error, data){
+                if(error){
+                    return reject(error);
+                }
 
-    return stdoutSplit;
-}
+                resolve({ 
+                    path: filePath, 
+                    content: data 
+                });
+            });
+        });
+
+        readFilePromises.push(readFilePromise);
+    });
+
+    const changedFiles = await Promise.all(readFilePromises);
+
+    return changedFiles;
+};
 
 
 function createXwikiHttpService (space, user, password){
@@ -128,14 +153,14 @@ function createXwikiHttpService (space, user, password){
 
     async function getLatestSync(){
         const syncLogDocument = await httpRequest("GET", "sync-log");
-
-        console.log(syncLogDocument);
         
         // TODO: Filter out ID
         const lastedSyncedCommitId = syncLogDocument.content;
 
         return lastedSyncedCommitId;
     }
+
+
 
     async function createSyncLogDocument() {
         var requestData = JSON.stringify({
@@ -186,7 +211,8 @@ function createXwikiHttpService (space, user, password){
                         return reject(new Error('Status code: ' + response.statusCode));
                     }
 
-                    resolve(body);
+                    const parsedBody = JSON.parse(body);
+                    resolve(parsedBody);
                 });
             });
             // reject on request error
