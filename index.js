@@ -91,27 +91,26 @@ async function run (){
     console.log("LastedSyncedCommitId: ");
     console.log(lastedSyncedCommitId);
 
-    const changedDocments = await getChangedFiles(lastedSyncedCommitId);
+    const changedDocments = await getChangedFiles(lastedSyncedCommitId, configuration.source);
 
     console.log("Changed documents");
     console.log(changedDocments);
 
+    const syncResult = await xWikiHttpService.syncDocuments(changedDocments);
     
-}
-
-async function syncDocuments(documents){
-    
+    console.log("Sync result: ");
+    console.log(syncResult);
 }
 
 // TODO: Abstract to git service
-async function getChangedFiles(commitId){
+async function getChangedFiles(commitId, source){
     if(!commitId){
         // https://stackoverflow.com/questions/40883798/how-to-get-git-diff-of-the-first-commit
         // "4b825dc642cb6eb9a060e54bf8d69288fbee4904 is the id of the "empty tree" in Git and it's always available in every repository."
         commitId = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
     }
 
-    const { stdout, stderr } = await exec("git diff --name-only " + commitId + " HEAD ./test-documents/");
+    const { stdout, stderr } = await exec("git diff --name-only " + commitId + " HEAD " + source);
 
     if(stderr){
         console.log('stdout:', stdout);
@@ -129,8 +128,13 @@ async function getChangedFiles(commitId){
                     return reject(error);
                 }
 
+                // TODO: Will this work with different types of path input such as "./"
+                // TODO: This .md is probably a bit to spesific (also a problem in the put to xwiki), and will be a problem with attachments
+                // TODO: Is this really the right place to do this replace anyways?
+                let replaceRegex = new RegExp("(^" + source + "|\.md$)", "g");
+                
                 resolve({ 
-                    path: filePath, 
+                    path: filePath.replace(replaceRegex, ""),
                     content: data 
                 });
             });
@@ -141,6 +145,9 @@ async function getChangedFiles(commitId){
 
     const changedFiles = await Promise.all(readFilePromises);
 
+    changedFiles.pop();
+    changedFiles.pop();
+
     return changedFiles;
 };
 
@@ -148,7 +155,8 @@ async function getChangedFiles(commitId){
 function createXwikiHttpService (space, user, password){
     return {
         getLatestSync: getLatestSync,
-        createSyncLogDocument, createSyncLogDocument
+        createSyncLogDocument, createSyncLogDocument,
+        syncDocuments: syncDocuments
     }
 
     async function getLatestSync(){
@@ -160,7 +168,22 @@ function createXwikiHttpService (space, user, password){
         return lastedSyncedCommitId;
     }
 
+    async function syncDocuments (documents){
+        let syncDocumentsPromises = [];
 
+        documents.forEach((document) => {
+            let requestData = JSON.stringify({
+                title: document.path,
+                syntax: "markdown/1.2",
+                content: document.content
+            });
+
+            let syncDocumentsPromise = httpRequest("PUT", document.path, requestData);
+            syncDocumentsPromises.push(syncDocumentsPromise);            
+        });
+
+        return Promise.all(syncDocumentsPromises);
+    }
 
     async function createSyncLogDocument() {
         var requestData = JSON.stringify({
@@ -176,6 +199,10 @@ function createXwikiHttpService (space, user, password){
 
     // Based on https://stackoverflow.com/questions/38533580/nodejs-how-to-promisify-http-request-reject-got-called-two-times#answer-38543075
     function httpRequest(method, page, postData) {
+
+        console.log("Outgoing request: ");
+        console.log(method + ": " + space.pathname + page);
+
         const auth = Buffer.from(user + ":" + password).toString("base64");
 
         return new Promise(function(resolve, reject) {
