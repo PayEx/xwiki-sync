@@ -96,10 +96,17 @@ async function run (){
     console.log("Changed documents");
     console.log(changedDocments);
 
-    const syncResult = await xWikiHttpService.syncDocuments(changedDocments);
+    const syncResult =  xWikiHttpService.syncDocuments(changedDocments);
+    // const subPageTest = await xWikiHttpService.syncDocuments([{
+    //     path: "spaces/baz/pages/WebHome",
+    //     content: "# Baz foo!"
+    // }]);
     
     console.log("Sync result: ");
     console.log(syncResult);
+
+    // console.log("Sync result (subPageTest): ");
+    // console.log(subPageTest);
 }
 
 // TODO: Abstract to git service
@@ -117,6 +124,8 @@ async function getChangedFiles(commitId, source){
         throw new Error("Crashed running diff, please review stdout above");
     }
 
+    // const { stdout, stderr } = await exec("git diff --name-only " + commitId + " HEAD " + source);
+
     const filePaths = stdout.split(/\n/);
     filePaths.pop();
     
@@ -128,14 +137,14 @@ async function getChangedFiles(commitId, source){
                     return reject(error);
                 }
 
-                // TODO: Will this work with different types of path input such as "./"
+                // TODO: Will this work with different types of path input such as "./"?
                 // TODO: This .md is probably a bit to spesific (also a problem in the put to xwiki), and will be a problem with attachments
                 // TODO: Is this really the right place to do this replace anyways?
                 let replaceRegex = new RegExp("(^" + source + "|\.md$)", "g");
                 
                 resolve({ 
                     path: filePath.replace(replaceRegex, ""),
-                    content: data 
+                    content: data
                 });
             });
         });
@@ -145,14 +154,16 @@ async function getChangedFiles(commitId, source){
 
     const changedFiles = await Promise.all(readFilePromises);
 
-    changedFiles.pop();
-    changedFiles.pop();
+    // changedFiles.pop();
+    // changedFiles.pop();
 
     return changedFiles;
 };
 
 
 function createXwikiHttpService (space, user, password){
+    // let syncIterations = 0;
+
     return {
         getLatestSync: getLatestSync,
         createSyncLogDocument, createSyncLogDocument,
@@ -160,7 +171,7 @@ function createXwikiHttpService (space, user, password){
     }
 
     async function getLatestSync(){
-        const syncLogDocument = await httpRequest("GET", "sync-log");
+        const syncLogDocument = await httpRequest("GET", "spaces/sync-log/pages/Webhome");
         
         // TODO: Filter out ID
         const lastedSyncedCommitId = syncLogDocument.content;
@@ -169,7 +180,15 @@ function createXwikiHttpService (space, user, password){
     }
 
     async function syncDocuments (documents){
+        // if(syncIterations >= 10){ 
+        //     return; 
+        // }
+
         let syncDocumentsPromises = [];
+        //let delayedDocuments = []
+
+
+        console.log("WIKI PATHS: ");
 
         documents.forEach((document) => {
             let requestData = JSON.stringify({
@@ -178,21 +197,48 @@ function createXwikiHttpService (space, user, password){
                 content: document.content
             });
 
-            let syncDocumentsPromise = httpRequest("PUT", document.path, requestData);
-            syncDocumentsPromises.push(syncDocumentsPromise);            
+            let wikiPath = "";
+            let documentsPathSplit = document.path.split("/");
+
+            documentsPathSplit.forEach((fragment, key) => {
+                let isLastFragment = key !== documentsPathSplit.length - 1;
+
+                if(fragment == "index" && isLastFragment){
+                    return;
+                }
+
+                wikiPath += "spaces/" + fragment + "/";
+            });
+
+            wikiPath += "pages/Webhome";
+
+            
+            console.log(wikiPath)
+
+            // let syncDocumentsPromise = httpRequest("PUT", wikiPath, requestData);
+            // syncDocumentsPromises.push(syncDocumentsPromise);            
         });
 
-        return Promise.all(syncDocumentsPromises);
+        // if(delayedDocuments.length){
+        //     syncIterations++;
+        //     await syncDocuments(delayedDocuments);
+        // } else {
+
+        // } 
+
+        
+
+        // return Promise.all(syncDocumentsPromises);
     }
 
     async function createSyncLogDocument() {
         var requestData = JSON.stringify({
             title: "Sync Document",
             syntax: "markdown/1.2",
-            content: "" 
+            content: ""
         });
 
-        const syncLogDocument = await httpRequest("PUT", "sync-log", requestData);
+        const syncLogDocument = await httpRequest("PUT", "spaces/sync-log/pages/Webhome", requestData);
 
         return syncLogDocument;
     }
