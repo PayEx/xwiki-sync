@@ -96,7 +96,7 @@ async function run (){
     console.log("Changed documents");
     console.log(changedDocments);
 
-    const syncResult =  xWikiHttpService.syncDocuments(changedDocments);
+    const syncResult =  await xWikiHttpService.syncDocuments(changedDocments);
     // const subPageTest = await xWikiHttpService.syncDocuments([{
     //     path: "spaces/baz/pages/WebHome",
     //     content: "# Baz foo!"
@@ -117,17 +117,25 @@ async function getChangedFiles(commitId, source){
         commitId = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
     }
 
-    const { stdout, stderr } = await exec("git diff --name-only " + commitId + " HEAD " + source);
+    let gitDiff = await exec("git diff --name-only " + commitId + " HEAD " + source);
 
-    if(stderr){
-        console.log('stdout:', stdout);
+    if(gitDiff.stderr){
+        console.log('stdout:', gitDiff.stdout);
         throw new Error("Crashed running diff, please review stdout above");
     }
 
-    // const { stdout, stderr } = await exec("git diff --name-only " + commitId + " HEAD " + source);
-
-    const filePaths = stdout.split(/\n/);
+    const filePaths = gitDiff.stdout.split(/\n/);
     filePaths.pop();
+
+    let gitDiffNewFiles = await exec("git diff --name-only --diff-filter=A " + commitId + " HEAD " + source);
+
+    if(gitDiffNewFiles.stderr){
+        console.log('stdout:', gitDiffNewFiles.stdout);
+        throw new Error("Crashed running diff, please review stdout above");
+    }
+
+    const newFilePaths = gitDiffNewFiles.stdout.split(/\n/);
+    newFilePaths.pop();
     
     let readFilePromises = [];
     filePaths.forEach((filePath) => {
@@ -154,8 +162,9 @@ async function getChangedFiles(commitId, source){
 
     const changedFiles = await Promise.all(readFilePromises);
 
-    // changedFiles.pop();
-    // changedFiles.pop();
+    changedFiles.pop();
+    changedFiles.pop();
+    changedFiles.pop();
 
     return changedFiles;
 };
@@ -171,7 +180,7 @@ function createXwikiHttpService (space, user, password){
     }
 
     async function getLatestSync(){
-        const syncLogDocument = await httpRequest("GET", "spaces/sync-log/pages/Webhome");
+        const syncLogDocument = await httpRequest("GET", "spaces/sync-log/pages/WebHome");
         
         // TODO: Filter out ID
         const lastedSyncedCommitId = syncLogDocument.content;
@@ -191,32 +200,37 @@ function createXwikiHttpService (space, user, password){
         console.log("WIKI PATHS: ");
 
         documents.forEach((document) => {
+            let pathSplit = document.path.split("/");
+            let lastIndex = pathSplit.length - 1;
+            let secondToLastIndex = lastIndex - 1;
+
+            // TODO: Read heading from document?
+            let wikiTitle = pathSplit[lastIndex] === "index" ? pathSplit[secondToLastIndex] : pathSplit[lastIndex];
+
             let requestData = JSON.stringify({
-                title: document.path,
+                title: wikiTitle,
                 syntax: "markdown/1.2",
                 content: document.content
             });
 
             let wikiPath = "";
-            let documentsPathSplit = document.path.split("/");
 
-            documentsPathSplit.forEach((fragment, key) => {
-                let isLastFragment = key !== documentsPathSplit.length - 1;
+            pathSplit.forEach((fragment, key) => {
+                let isLastFragment = key === lastIndex - 1;
 
-                if(fragment == "index" && isLastFragment){
+                if(fragment === "index" && isLastFragment){
                     return;
                 }
 
                 wikiPath += "spaces/" + fragment + "/";
             });
 
-            wikiPath += "pages/Webhome";
-
+            wikiPath += "pages/WebHome";            
             
-            console.log(wikiPath)
-
-            // let syncDocumentsPromise = httpRequest("PUT", wikiPath, requestData);
-            // syncDocumentsPromises.push(syncDocumentsPromise);            
+            console.log(document.path + " -> " +  wikiPath);
+            
+            let syncDocumentsPromise = httpRequest("PUT", wikiPath, requestData);
+            syncDocumentsPromises.push(syncDocumentsPromise);            
         });
 
         // if(delayedDocuments.length){
@@ -228,7 +242,7 @@ function createXwikiHttpService (space, user, password){
 
         
 
-        // return Promise.all(syncDocumentsPromises);
+        return Promise.all(syncDocumentsPromises);
     }
 
     async function createSyncLogDocument() {
@@ -238,7 +252,7 @@ function createXwikiHttpService (space, user, password){
             content: ""
         });
 
-        const syncLogDocument = await httpRequest("PUT", "spaces/sync-log/pages/Webhome", requestData);
+        const syncLogDocument = await httpRequest("PUT", "spaces/sync-log/pages/WebHome", requestData);
 
         return syncLogDocument;
     }
@@ -302,45 +316,3 @@ function createXwikiHttpService (space, user, password){
         });
     }
 }
-
-
-
-// var fileName = "foo",
-//     fileExtension = "md",
-//     wikiTitle = "foo-test-19",
-//     filePath = path.join(__dirname, fileName + "." + fileExtension);
-
-// fs.readFile(filePath, { encoding: 'utf-8' }, function (error, data){
-//     var postRequest = http.request({
-//         hostname: configuration.url.hostname,
-//         port: configuration.url.port,
-//         path: configuration.url.pathname + wikiTitle,
-//         method: "PUT",
-//         headers: {
-//             "Authorization": "Basic " +  auth,
-//             "Content-Type": "application/json",
-//             "Allow": "application/json"
-//         }
-//     }, (res) => {
-//         res.setEncoding('utf8');
-//         res.on('data', function (chunk) {
-//             console.log('\n Response: ' + chunk);
-
-//             console.log("\n Ok, I'm done. See you later alligator.");
-//             console.log("------------------------------------------------------------");
-//         });
-//     });
-    
-//     var requestData = JSON.stringify({
-//         title: wikiTitle,
-//         creator: "TestTest",
-//         syntax: "markdown/1.2",
-//         content: data 
-//     });
-
-//     postRequest.write(requestData);
-
-//     postRequest.end();
-// });
-
-
