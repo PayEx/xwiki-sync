@@ -149,10 +149,11 @@ async function getChangedFiles(commitId, source){
                 // TODO: This .md is probably a bit to spesific (also a problem in the put to xwiki), and will be a problem with attachments
                 // TODO: Is this really the right place to do this replace anyways?
                 let replaceRegex = new RegExp("(^" + source + "|\.md$)", "g");
-                
+
                 resolve({ 
                     path: filePath.replace(replaceRegex, ""),
-                    content: data
+                    content: data,
+                    isNewFile: newFilePaths.contains(filePath)
                 });
             });
         });
@@ -171,7 +172,7 @@ async function getChangedFiles(commitId, source){
 
 
 function createXwikiHttpService (space, user, password){
-    // let syncIterations = 0;
+    let syncIterations = 0;
 
     return {
         getLatestSync: getLatestSync,
@@ -189,17 +190,22 @@ function createXwikiHttpService (space, user, password){
     }
 
     async function syncDocuments (documents){
-        // if(syncIterations >= 10){ 
-        //     return; 
-        // }
-
         let syncDocumentsPromises = [];
-        //let delayedDocuments = []
+        let delayedDocuments = []
 
+        if(syncIterations >= 10){
+            console.warn("Do you have a very deep heirarchy? If not there seem to be something infinite going on. I'm just going to thr...")
+            throw new Error("Recursive function ran 10 levels deep.");
+        }
 
         console.log("WIKI PATHS: ");
 
         documents.forEach((document) => {
+            if(hasNewParent(document, documents)){
+                delayedDocuments.push(document);
+                return;
+            }
+
             let pathSplit = document.path.split("/");
             let lastIndex = pathSplit.length - 1;
             let secondToLastIndex = lastIndex - 1;
@@ -225,24 +231,22 @@ function createXwikiHttpService (space, user, password){
                 wikiPath += "spaces/" + fragment + "/";
             });
 
-            wikiPath += "pages/WebHome";            
-            
-            console.log(document.path + " -> " +  wikiPath);
+            wikiPath += "pages/WebHome";
             
             let syncDocumentsPromise = httpRequest("PUT", wikiPath, requestData);
             syncDocumentsPromises.push(syncDocumentsPromise);            
         });
 
-        // if(delayedDocuments.length){
-        //     syncIterations++;
-        //     await syncDocuments(delayedDocuments);
-        // } else {
-
-        // } 
-
+        var syncDocumentsPromise = Promise.all(syncDocumentsPromises);
         
+        syncDocumentsPromise.then(function(){
+            if(delayedDocuments.length){
+                syncIterations++;
+                await syncDocuments(delayedDocuments);
+            }
+        });
 
-        return Promise.all(syncDocumentsPromises);
+        return syncDocumentsPromise(syncDocumentsPromise);
     }
 
     async function createSyncLogDocument() {
@@ -255,6 +259,33 @@ function createXwikiHttpService (space, user, password){
         const syncLogDocument = await httpRequest("PUT", "spaces/sync-log/pages/WebHome", requestData);
 
         return syncLogDocument;
+    }
+
+    function hasNewParent(document, documents){
+        let hasNewParent = false;
+
+        let i  = 0;
+        for(i; i < documents.length; i++){
+            let otherDocument = documents[i];
+            let otherDocumentPath;
+
+            if(!otherDocument.isNewFile){
+               continue;
+            }
+
+            if(otherDocument.path.endsWith("/index")){
+                otherDocumentPath = otherDocumentPath.replace("/index")
+            } else {
+                continue;
+            }
+
+            if(document.path.StartWith(otherDocumentPath)){
+                hasNewParent = true;
+                break;
+            } 
+        };
+
+        return hasNewParent;
     }
 
     // Based on https://stackoverflow.com/questions/38533580/nodejs-how-to-promisify-http-request-reject-got-called-two-times#answer-38543075

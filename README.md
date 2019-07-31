@@ -6,6 +6,8 @@ Local test usage with default credentials
 
 `node index.js --user=Admin --password=admin --wiki=http://localhost:8080/xwiki/rest/wikis/xwiki/spaces/Sandbox/pages/ --source=test-documents`
 
+`node index.js --user=Admin --password=admin --wiki=http://localhost:8080/xwiki/rest/wikis/xwiki/spaces/myroot/ --source=test-documents/`
+
 ## Todos
 - [x] Create NPM Package
 - [x] Use NPM Package in doc repo
