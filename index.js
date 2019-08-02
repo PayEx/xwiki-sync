@@ -153,7 +153,7 @@ async function getChangedFiles(commitId, source){
                 resolve({ 
                     path: filePath.replace(replaceRegex, ""),
                     content: data,
-                    isNewFile: newFilePaths.contains(filePath)
+                    isNewFile: newFilePaths.includes(filePath)
                 });
             });
         });
@@ -163,9 +163,9 @@ async function getChangedFiles(commitId, source){
 
     const changedFiles = await Promise.all(readFilePromises);
 
-    changedFiles.pop();
-    changedFiles.pop();
-    changedFiles.pop();
+    // changedFiles.pop();
+    // changedFiles.pop();
+    // changedFiles.pop();
 
     return changedFiles;
 };
@@ -176,7 +176,7 @@ function createXwikiHttpService (space, user, password){
 
     return {
         getLatestSync: getLatestSync,
-        createSyncLogDocument, createSyncLogDocument,
+        createSyncLogDocument: createSyncLogDocument,
         syncDocuments: syncDocuments
     }
 
@@ -185,68 +185,71 @@ function createXwikiHttpService (space, user, password){
         
         // TODO: Filter out ID
         const lastedSyncedCommitId = syncLogDocument.content;
-
         return lastedSyncedCommitId;
     }
 
     async function syncDocuments (documents){
-        let syncDocumentsPromises = [];
-        let delayedDocuments = []
+        let allDocumentsSyncedPromise = new Promise(async (resolve, reject) => {
+            let syncDocumentsPromises = [];
+            let delayedDocuments = [];
 
-        if(syncIterations >= 10){
-            console.warn("Do you have a very deep heirarchy? If not there seem to be something infinite going on. I'm just going to thr...")
-            throw new Error("Recursive function ran 10 levels deep.");
-        }
-
-        console.log("WIKI PATHS: ");
-
-        documents.forEach((document) => {
-            if(hasNewParent(document, documents)){
-                delayedDocuments.push(document);
-                return;
+            if(syncIterations > 10){
+                console.warn("Do you have a very deep heirarchy? If not there seem to be something infinite going on. I'm just going to thr...")
+                throw new Error("Recursive function ran 10 times.");
             }
-
-            let pathSplit = document.path.split("/");
-            let lastIndex = pathSplit.length - 1;
-            let secondToLastIndex = lastIndex - 1;
-
-            // TODO: Read heading from document?
-            let wikiTitle = pathSplit[lastIndex] === "index" ? pathSplit[secondToLastIndex] : pathSplit[lastIndex];
-
-            let requestData = JSON.stringify({
-                title: wikiTitle,
-                syntax: "markdown/1.2",
-                content: document.content
-            });
-
-            let wikiPath = "";
-
-            pathSplit.forEach((fragment, key) => {
-                let isLastFragment = key === lastIndex - 1;
-
-                if(fragment === "index" && isLastFragment){
+    
+            documents.forEach((document) => {
+                if(hasNewParent(document, documents)){
+                    delayedDocuments.push(document);
                     return;
                 }
 
-                wikiPath += "spaces/" + fragment + "/";
+                let syncDocumentPromise = syncDocument(document);
+                syncDocumentsPromises.push(syncDocumentPromise); 
             });
 
-            wikiPath += "pages/WebHome";
-            
-            let syncDocumentsPromise = httpRequest("PUT", wikiPath, requestData);
-            syncDocumentsPromises.push(syncDocumentsPromise);            
-        });
+            await Promise.all(syncDocumentsPromises);
 
-        var syncDocumentsPromise = Promise.all(syncDocumentsPromises);
-        
-        syncDocumentsPromise.then(function(){
             if(delayedDocuments.length){
                 syncIterations++;
                 await syncDocuments(delayedDocuments);
             }
+
+            resolve();
         });
 
-        return syncDocumentsPromise(syncDocumentsPromise);
+       return allDocumentsSyncedPromise;
+    }
+
+    async function syncDocument(document){
+        let pathSplit = document.path.split("/");
+        let lastIndex = pathSplit.length - 1;
+        let secondToLastIndex = lastIndex - 1;
+
+        // TODO: Read heading from document?
+        let wikiTitle = pathSplit[lastIndex] === "index" ? pathSplit[secondToLastIndex] : pathSplit[lastIndex];
+
+        let requestData = JSON.stringify({
+            title: wikiTitle,
+            syntax: "markdown/1.2",
+            content: document.content
+        });
+
+        let wikiPath = "";
+
+        pathSplit.forEach((fragment, key) => {
+            let isLastFragment = key === lastIndex - 1;
+
+            if(fragment === "index" && isLastFragment){
+                return;
+            }
+
+            wikiPath += "spaces/" + fragment + "/";
+        });
+
+        wikiPath += "pages/WebHome";
+        
+        return httpRequest("PUT", wikiPath, requestData);
     }
 
     async function createSyncLogDocument() {
@@ -274,12 +277,12 @@ function createXwikiHttpService (space, user, password){
             }
 
             if(otherDocument.path.endsWith("/index")){
-                otherDocumentPath = otherDocumentPath.replace("/index")
+                otherDocumentPath = otherDocument.path.replace("/index")
             } else {
                 continue;
             }
 
-            if(document.path.StartWith(otherDocumentPath)){
+            if(document.path.startsWith(otherDocumentPath)){
                 hasNewParent = true;
                 break;
             } 
