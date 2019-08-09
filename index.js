@@ -88,25 +88,15 @@ async function run (){
         }
     }
 
-    console.log("LastedSyncedCommitId: ");
+    console.log("Lasted synced commit ID: ");
     console.log(lastedSyncedCommitId);
 
     const changedDocments = await getChangedFiles(lastedSyncedCommitId, configuration.source);
 
-    console.log("Changed documents");
+    console.log("Changed documents: ");
     console.log(changedDocments);
 
-    const syncResult =  await xWikiHttpService.syncDocuments(changedDocments);
-    // const subPageTest = await xWikiHttpService.syncDocuments([{
-    //     path: "spaces/baz/pages/WebHome",
-    //     content: "# Baz foo!"
-    // }]);
-    
-    console.log("Sync result: ");
-    console.log(syncResult);
-
-    // console.log("Sync result (subPageTest): ");
-    // console.log(subPageTest);
+    await xWikiHttpService.syncDocuments(changedDocments);
 }
 
 // TODO: Abstract to git service
@@ -127,15 +117,6 @@ async function getChangedFiles(commitId, source){
     const filePaths = gitDiff.stdout.split(/\n/);
     filePaths.pop();
 
-    let gitDiffNewFiles = await exec("git diff --name-only --diff-filter=A " + commitId + " HEAD " + source);
-
-    if(gitDiffNewFiles.stderr){
-        console.log('stdout:', gitDiffNewFiles.stdout);
-        throw new Error("Crashed running diff, please review stdout above");
-    }
-
-    const newFilePaths = gitDiffNewFiles.stdout.split(/\n/);
-    newFilePaths.pop();
     
     let readFilePromises = [];
     filePaths.forEach((filePath) => {
@@ -152,8 +133,7 @@ async function getChangedFiles(commitId, source){
 
                 resolve({ 
                     path: filePath.replace(replaceRegex, ""),
-                    content: data,
-                    isNewFile: newFilePaths.includes(filePath)
+                    content: data
                 });
             });
         });
@@ -162,10 +142,6 @@ async function getChangedFiles(commitId, source){
     });
 
     const changedFiles = await Promise.all(readFilePromises);
-
-    // changedFiles.pop();
-    // changedFiles.pop();
-    // changedFiles.pop();
 
     return changedFiles;
 };
@@ -189,36 +165,14 @@ function createXwikiHttpService (space, user, password){
     }
 
     async function syncDocuments (documents){
-        let allDocumentsSyncedPromise = new Promise(async (resolve, reject) => {
-            let syncDocumentsPromises = [];
-            let delayedDocuments = [];
+        let syncDocumentsPromises = [];
 
-            if(syncIterations > 10){
-                console.warn("Do you have a very deep heirarchy? If not there seem to be something infinite going on. I'm just going to thr...")
-                throw new Error("Recursive function ran 10 times.");
-            }
-    
-            documents.forEach((document) => {
-                if(hasNewParent(document, documents)){
-                    delayedDocuments.push(document);
-                    return;
-                }
-
-                let syncDocumentPromise = syncDocument(document);
-                syncDocumentsPromises.push(syncDocumentPromise); 
-            });
-
-            await Promise.all(syncDocumentsPromises);
-
-            if(delayedDocuments.length){
-                syncIterations++;
-                await syncDocuments(delayedDocuments);
-            }
-
-            resolve();
+        documents.forEach((document) => {
+            let syncDocumentPromise = syncDocument(document);
+            syncDocumentsPromises.push(syncDocumentPromise); 
         });
 
-       return allDocumentsSyncedPromise;
+        return Promise.all(syncDocumentsPromises);
     }
 
     async function syncDocument(document){
@@ -262,33 +216,6 @@ function createXwikiHttpService (space, user, password){
         const syncLogDocument = await httpRequest("PUT", "spaces/sync-log/pages/WebHome", requestData);
 
         return syncLogDocument;
-    }
-
-    function hasNewParent(document, documents){
-        let hasNewParent = false;
-
-        let i  = 0;
-        for(i; i < documents.length; i++){
-            let otherDocument = documents[i];
-            let otherDocumentPath;
-
-            if(!otherDocument.isNewFile){
-               continue;
-            }
-
-            if(otherDocument.path.endsWith("/index")){
-                otherDocumentPath = otherDocument.path.replace("/index")
-            } else {
-                continue;
-            }
-
-            if(document.path.startsWith(otherDocumentPath)){
-                hasNewParent = true;
-                break;
-            } 
-        };
-
-        return hasNewParent;
     }
 
     // Based on https://stackoverflow.com/questions/38533580/nodejs-how-to-promisify-http-request-reject-got-called-two-times#answer-38543075
