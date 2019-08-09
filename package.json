@@ -4,7 +4,8 @@
   "description": "Sync documents from disk to xwiki instance (Work in progress).",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "./cli.js --user=Admin --password=admin --wiki=http://localhost:8080/xwiki/rest/wikis/xwiki/spaces/myroot/ --source=test-documents/"
   },
   "repository": {
     "type": "git",
@@ -19,5 +20,8 @@
     "url": "https://github.com/PayEx/xwiki-sync/issues"
   },
   "homepage": "https://github.com/PayEx/xwiki-sync#readme",
-  "dependencies": {}
+  "dependencies": {},
+  "bin": {
+    "xwiki-sync": "./cli.js"
+  }
 }
