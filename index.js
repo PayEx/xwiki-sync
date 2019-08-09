@@ -238,7 +238,7 @@ function createXwikiHttpService (space, user, password){
         let wikiPath = "";
 
         pathSplit.forEach((fragment, key) => {
-            let isLastFragment = key === lastIndex - 1;
+            let isLastFragment = key === lastIndex;
 
             if(fragment === "index" && isLastFragment){
                 return;
