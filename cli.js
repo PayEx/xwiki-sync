@@ -99,6 +99,10 @@ async function run (){
     console.log(changedDocments);
 
     await xWikiHttpService.syncDocuments(changedDocments);
+
+    var headId = await getHead();
+
+    await xWikiHttpService.updateSyncLogDocument(headId);
 }
 
 // TODO: Abstract to git service
@@ -118,7 +122,6 @@ async function getChangedFiles(commitId, source){
 
     const filePaths = gitDiff.stdout.split(/\n/);
     filePaths.pop();
-
     
     let readFilePromises = [];
     filePaths.forEach((filePath) => {
@@ -148,18 +151,23 @@ async function getChangedFiles(commitId, source){
     return changedFiles;
 };
 
+async function getHead(){
+    // TODO: Error handling? 
+    const commandResult = await exec("git rev-parse HEAD");
+    return commandResult.stdout.split(/\n/)[0];
+}
+
 
 function createXwikiHttpService (space, user, password){
     return {
         getLatestSync: getLatestSync,
         createSyncLogDocument: createSyncLogDocument,
-        syncDocuments: syncDocuments
+        syncDocuments: syncDocuments,
+        updateSyncLogDocument: updateSyncLogDocument
     }
 
     async function getLatestSync(){
         const syncLogDocument = await httpRequest("GET", "spaces/sync-log/pages/WebHome");
-        
-        // TODO: Filter out ID
         const lastedSyncedCommitId = syncLogDocument.content;
         return lastedSyncedCommitId;
     }
@@ -216,6 +224,20 @@ function createXwikiHttpService (space, user, password){
         const syncLogDocument = await httpRequest("PUT", "spaces/sync-log/pages/WebHome", requestData);
 
         return syncLogDocument;
+    }
+
+    async function updateSyncLogDocument(commitId){
+        // TODO: Should this be a terminal page?
+        // TODO: Should earlier commits be saved?
+        // TODO: Should the page contain more info then just the commit id?
+        // TODO: If no, then their is no need for this and createSyncLogDocument()
+        var requestData = JSON.stringify({
+            title: "Sync Document",
+            syntax: "markdown/1.2",
+            content: commitId
+        });
+
+        return httpRequest("PUT", "spaces/sync-log/pages/WebHome", requestData);
     }
 
     // Based on https://stackoverflow.com/questions/38533580/nodejs-how-to-promisify-http-request-reject-got-called-two-times#answer-38543075
