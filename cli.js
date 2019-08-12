@@ -150,8 +150,6 @@ async function getChangedFiles(commitId, source){
 
 
 function createXwikiHttpService (space, user, password){
-    let syncIterations = 0;
-
     return {
         getLatestSync: getLatestSync,
         createSyncLogDocument: createSyncLogDocument,
