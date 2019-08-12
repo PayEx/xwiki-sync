@@ -2,7 +2,6 @@
 
 const http = require("http"),
     fs = require('fs'),
-    path = require('path'),
     util = require('util');
     exec = util.promisify(require('child_process').exec);
 
