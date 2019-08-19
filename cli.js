@@ -112,7 +112,7 @@ async function getChangedFiles(commitId, source){
         commitId = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
     }
 
-    let gitDiff = await exec("git diff --name-only " + commitId + " HEAD " + source);
+    let gitDiff = await exec("git diff --name-only --diff-filter=AM " + commitId + " HEAD " + source);
 
     if(gitDiff.stderr){
         console.log('stdout:', gitDiff.stdout);
@@ -133,7 +133,7 @@ async function getChangedFiles(commitId, source){
                 // TODO: Will this work with different types of path input such as "./"?
                 // TODO: This .md is probably a bit to spesific (also a problem in the put to xwiki), and will be a problem with attachments
                 // TODO: Is this really the right place to do this replace anyways?
-                let replaceRegex = new RegExp("(^" + source + "|\.md$)", "g");
+                let replaceRegex = new RegExp("^" + source);
 
                 resolve({ 
                     path: filePath.replace(replaceRegex, ""),
@@ -174,43 +174,59 @@ function createXwikiHttpService (space, user, password){
     async function syncDocuments (documents){
         let syncDocumentsPromises = [];
 
-        documents.forEach((document) => {
+        const pages = documents.filter((document) => { return /.md$/.test(document.path); });
+        const attachments = documents.filter((document) => { return /.png/.test(document.path); });
+
+        pages.forEach((document) => {
             let syncDocumentPromise = syncDocument(document);
             syncDocumentsPromises.push(syncDocumentPromise); 
+        });
+
+        attachments.forEach((attachment) => {
+            let syncAttachmentPromise = syncAttachment(attachment);
+            syncDocumentsPromises.push(syncAttachmentPromise); 
         });
 
         return Promise.all(syncDocumentsPromises);
     }
 
     async function syncDocument(document){
-        let pathSplit = document.path.split("/");
-        let lastIndex = pathSplit.length - 1;
-        let secondToLastIndex = lastIndex - 1;
+        // TODO: Could this be solved better with regex?
+        let wikiTitle;
+        let contentArray = document.content.split("\\n");
+        let firstLine = contentArray[0];
 
-        // TODO: Read heading from document?
-        let wikiTitle = pathSplit[lastIndex] === "index" ? pathSplit[secondToLastIndex] : pathSplit[lastIndex];
+        if(firstLine.startsWith("#")){
+            wikiTitle = firstLine.replace("#", "");
+            contentArray.shift();
+            document.content = contentArray.join("\\n");
+        } else {
+            // TODO: Redudans
+            let pathWithoutFileExtention = document.path.replace(/(.md|.png)$/, "");
+            let pathSplit = pathWithoutFileExtention.split("/");
+            wikiTitle = pathSplit[pathSplit.length - 1] === "index" ? pathSplit[pathSplit.length - 2] : pathSplit[pathSplit.length - 1];
+        }
 
         let requestData = JSON.stringify({
             title: wikiTitle,
             syntax: "markdown/1.2",
             content: document.content
         });
-
-        let wikiPath = "";
-
-        pathSplit.forEach((fragment, key) => {
-            let isLastFragment = key === lastIndex;
-
-            if(fragment === "index" && isLastFragment){
-                return;
-            }
-
-            wikiPath += "spaces/" + fragment + "/";
-        });
-
-        wikiPath += "pages/WebHome";
         
-        return httpRequest("PUT", wikiPath, requestData);
+        const path = getWikiSpacePath(document.path) + "pages/WebHome";
+
+        return httpRequest("PUT", path, requestData);
+    }
+
+    async function syncAttachment(attachment){
+        
+        
+
+        const space = getWikiSpacePath(attachment.path);
+        const attachmentName = /[\w-]*\.png$/.exec(attachment.path);
+        const path =  space +  "pages/WebHome/attachments/" + attachmentName;
+        const contentBuffer = new Buffer(attachment.content, "binary");
+        return httpRequest("PUT", path, contentBuffer, "image/png");
     }
 
     async function createSyncLogDocument() {
@@ -240,7 +256,7 @@ function createXwikiHttpService (space, user, password){
     }
 
     // Based on https://stackoverflow.com/questions/38533580/nodejs-how-to-promisify-http-request-reject-got-called-two-times#answer-38543075
-    function httpRequest(method, page, postData) {
+    function httpRequest(method, page, postData, contentType) {
 
         console.log("Outgoing request: ");
         console.log(method + ": " + space.pathname + page);
@@ -255,7 +271,7 @@ function createXwikiHttpService (space, user, password){
                 method: method,
                 headers: {
                     "Authorization": "Basic " +  auth,
-                    "Content-Type": "application/json",
+                    "Content-Type": contentType ? contentType : "application/json",
                     "Allow": "application/json",
                     "Accept": "application/json"
                 }
@@ -296,5 +312,25 @@ function createXwikiHttpService (space, user, password){
             // IMPORTANT
             request.end();
         });
+    }
+
+    function getWikiSpacePath(filepath){
+        let pathWithoutFileExtention = filepath.replace(/(.md|.png)$/, "");
+        let pathSplit = pathWithoutFileExtention.split("/");
+        let lastIndex = pathSplit.length - 1;
+
+        let wikiPath = "";
+
+        pathSplit.forEach((fragment, key) => {
+            let isLastFragment = key === lastIndex;
+
+            if(isLastFragment && (fragment === "index" || /.png$/.test(filepath))){
+                return;
+            }
+
+            wikiPath += "spaces/" + fragment + "/";
+        });
+
+        return wikiPath;
     }
 }
