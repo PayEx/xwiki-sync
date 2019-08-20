@@ -193,13 +193,13 @@ function createXwikiHttpService (space, user, password){
     async function syncDocument(document){
         // TODO: Could this be solved better with regex?
         let wikiTitle;
-        let contentArray = document.content.split("\\n");
+        let contentArray = document.content.split("\n");
         let firstLine = contentArray[0];
 
         if(firstLine.startsWith("#")){
             wikiTitle = firstLine.replace("#", "");
             contentArray.shift();
-            document.content = contentArray.join("\\n");
+            document.content = contentArray.join("\n");
         } else {
             // TODO: Redudans
             let pathWithoutFileExtention = document.path.replace(/(.md|.png)$/, "");
