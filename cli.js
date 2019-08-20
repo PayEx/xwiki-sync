@@ -173,6 +173,7 @@ function createXwikiHttpService (space, user, password){
 
     async function syncDocuments (documents){
         let syncDocumentsPromises = [];
+        let syncAttachmentsPromises = [];
 
         const pages = documents.filter((document) => { return /.md$/.test(document.path); });
         const attachments = documents.filter((document) => { return /.png/.test(document.path); });
@@ -182,12 +183,14 @@ function createXwikiHttpService (space, user, password){
             syncDocumentsPromises.push(syncDocumentPromise); 
         });
 
+        await Promise.all(syncDocumentsPromises);
+
         attachments.forEach((attachment) => {
             let syncAttachmentPromise = syncAttachment(attachment);
-            syncDocumentsPromises.push(syncAttachmentPromise); 
+            syncAttachmentsPromises.push(syncAttachmentPromise); 
         });
 
-        return Promise.all(syncDocumentsPromises);
+        return Promise.all(syncAttachmentsPromises);
     }
 
     async function syncDocument(document){
@@ -288,8 +291,7 @@ function createXwikiHttpService (space, user, password){
                     }
 
                     if (response.statusCode < 200 || response.statusCode >= 300) {
-                        console.log("Bad status: ");
-                        console.log(body);
+                        console.log("Questionable request (status code: " + response.statusCode + "): ", space.pathname + page);
                         return reject(new Error('Status code: ' + response.statusCode));
                     }
 
