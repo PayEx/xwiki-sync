@@ -101,7 +101,7 @@ async function run (){
 
     var headId = await getHead();
 
-    await xWikiHttpService.updateSyncLogDocument(headId);
+    //await xWikiHttpService.updateSyncLogDocument(headId);
 }
 
 // TODO: Abstract to git service
@@ -125,19 +125,19 @@ async function getChangedFiles(commitId, source){
     let readFilePromises = [];
     filePaths.forEach((filePath) => {
         let readFilePromise = new Promise(function(resolve, reject) {
-            fs.readFile(filePath, { encoding: 'utf-8' }, function (error, data){
+            fs.readFile(filePath, function (error, data){
                 if(error){
                     return reject(error);
                 }
 
                 // TODO: Will this work with different types of path input such as "./"?
-                // TODO: This .md is probably a bit to spesific (also a problem in the put to xwiki), and will be a problem with attachments
                 // TODO: Is this really the right place to do this replace anyways?
                 let replaceRegex = new RegExp("^" + source);
 
+
                 resolve({ 
                     path: filePath.replace(replaceRegex, ""),
-                    content: data
+                    content: /.md$/.test(filePath) ? data.toString("utf-8") : data
                 });
             });
         });
@@ -219,14 +219,11 @@ function createXwikiHttpService (space, user, password){
     }
 
     async function syncAttachment(attachment){
-        
-        
-
         const space = getWikiSpacePath(attachment.path);
         const attachmentName = /[\w-]*\.png$/.exec(attachment.path);
         const path =  space +  "pages/WebHome/attachments/" + attachmentName;
-        const contentBuffer = new Buffer(attachment.content, "binary");
-        return httpRequest("PUT", path, contentBuffer, "image/png");
+
+        return httpRequest("PUT", path, attachment.content, "image/png");
     }
 
     async function createSyncLogDocument() {
