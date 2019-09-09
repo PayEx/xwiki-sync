@@ -210,10 +210,16 @@ function createXwikiHttpService (space, user, password){
             wikiTitle = pathSplit[pathSplit.length - 1] === "index" ? pathSplit[pathSplit.length - 2] : pathSplit[pathSplit.length - 1];
         }
 
+        const contentAsXwikiMarkdown = document.content.replace(/!?\[(.*)\]\[(\S*)\]/, function(match, label, url){   
+            if(match.startsWith("!")){
+                return `![[${label}|${url}]]`;
+            }
+        });
+
         let requestData = JSON.stringify({
             title: wikiTitle,
             syntax: "markdown/1.2",
-            content: document.content
+            content: contentAsXwikiMarkdown
         });
         
         const path = getWikiSpacePath(document.path) + "pages/WebHome";
