@@ -1,2 +1,5 @@
 # Main index 
-![Foo][foo.png]
+![Foo](foo.png)
+[Sub folder two / Sub sub folder ](/myroot/sub-folder-two/sub-sub-folder) <br>
+[Sub folder two / Index ](/myroot/sub-folder-two/index.md) <br>
+[Sub folder three / Bar](/myroot/sub-folder-three/bar.md) <br>

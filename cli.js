@@ -210,9 +210,13 @@ function createXwikiHttpService (space, user, password){
             wikiTitle = pathSplit[pathSplit.length - 1] === "index" ? pathSplit[pathSplit.length - 2] : pathSplit[pathSplit.length - 1];
         }
 
-        const contentAsXwikiMarkdown = document.content.replace(/!?\[(.*)\]\[(\S*)\]/, function(match, label, url){   
+        const contentAsXwikiMarkdown = document.content.replace(/!?\[(.*)\]\((\S*)\)/g, function(match, label, url){
+
             if(match.startsWith("!")){
                 return `![[${label}|${url}]]`;
+            } else {
+                const pageName = getPageName(url);
+                return `[[${label}|${pageName}]]`;
             }
         });
 
@@ -337,5 +341,13 @@ function createXwikiHttpService (space, user, password){
         });
 
         return wikiPath;
+    }
+
+    function getPageName(url){
+        // TODO: This seems to be related to the code above
+        const urlWithoutLeadingSlash = url.replace(/^\//, "");
+        const urlWithoutExtention = urlWithoutLeadingSlash.replace(/\.md$/, "");
+        const urlWithoutIndex = urlWithoutExtention.replace(/\/index$/, "");
+        return urlWithoutIndex.replace(space, "").replace(/\//g, ".");
     }
 }
