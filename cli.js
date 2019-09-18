@@ -344,7 +344,7 @@ function createXwikiHttpService (space, user, password){
     }
 
     function getPageName(url){
-        // TODO: This seems to be related to the code above
+        // TODO: This seems to be some of the same logic as the get space function
         const urlWithoutLeadingSlash = url.replace(/^\//, "");
         const urlWithoutExtention = urlWithoutLeadingSlash.replace(/\.md$/, "");
         const urlWithoutIndex = urlWithoutExtention.replace(/\/index$/, "");
