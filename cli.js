@@ -210,7 +210,8 @@ function createXwikiHttpService (space, user, password){
             wikiTitle = pathSplit[pathSplit.length - 1] === "index" ? pathSplit[pathSplit.length - 2] : pathSplit[pathSplit.length - 1];
         }
 
-        const contentAsXwikiMarkdown = document.content.replace(/!?\[(.*)\]\((\S*)\)/g, function(match, label, url){
+        // TODO: What about external links without http in their urls
+        const contentAsXwikiMarkdown = document.content.replace(/!?\[(.*?)\]\(((?!http)\S*)\)/g, function(match, label, url){
 
             if(match.startsWith("!")){
                 return `![[${label}|${url}]]`;
