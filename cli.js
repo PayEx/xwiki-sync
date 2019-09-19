@@ -199,7 +199,7 @@ function createXwikiHttpService (space, user, password){
         let contentArray = document.content.split("\n");
         let firstLine = contentArray[0];
 
-        if(firstLine.startsWith("#")){
+        if(firstLine.match(/^#\s/)){
             wikiTitle = firstLine.replace("#", "");
             contentArray.shift();
             document.content = contentArray.join("\n");
