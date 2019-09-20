@@ -278,7 +278,7 @@ function createXwikiHttpService (space, user, password){
             var request = http.request({
                 hostname: space.hostname,
                 port: space.port,
-                path: space.pathname + page,
+                path: encodeURI(space.pathname + page),
                 method: method,
                 headers: {
                     "Authorization": "Basic " +  auth,
