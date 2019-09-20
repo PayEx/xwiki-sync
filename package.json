@@ -1,6 +1,6 @@
 {
   "name": "xwiki-sync",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Sync documents from disk to xwiki instance (Work in progress).",
   "main": "index.js",
   "scripts": {
