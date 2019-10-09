@@ -172,23 +172,18 @@ function createXwikiHttpService (space, user, password){
     }
 
     async function syncDocuments (documents){
-        let syncDocumentsPromises = [];
-        let syncAttachmentsPromises = [];
-
         const pages = documents.filter((document) => { return /.md$/.test(document.path); });
         const attachments = documents.filter((document) => { return /.png/.test(document.path); });
 
-        pages.forEach((document) => {
-            let syncDocumentPromise = syncDocument(document);
-            syncDocumentsPromises.push(syncDocumentPromise); 
-        });
+        const syncDocumentsPromises = throttle(pages, (document) => {
+            return syncDocument(document);
+        }, 5);
 
         await Promise.all(syncDocumentsPromises);
 
-        attachments.forEach((attachment) => {
-            let syncAttachmentPromise = syncAttachment(attachment);
-            syncAttachmentsPromises.push(syncAttachmentPromise); 
-        });
+        const syncAttachmentsPromises = throttle(attachments, (attachment) => {
+            return syncAttachment(attachment);
+        }, 5);
 
         return Promise.all(syncAttachmentsPromises);
     }
@@ -307,7 +302,12 @@ function createXwikiHttpService (space, user, password){
                     }
 
                     const parsedBody = JSON.parse(body);
+
+                    console.log("Request finished: ");
+                    console.log(method + ": " + space.pathname + page);
+
                     resolve(parsedBody);
+                    
                 });
             });
             // reject on request error
@@ -350,5 +350,28 @@ function createXwikiHttpService (space, user, password){
         const urlWithoutExtention = urlWithoutLeadingSlash.replace(/\.md$/, "");
         const urlWithoutIndex = urlWithoutExtention.replace(/\/index$/, "");
         return urlWithoutIndex.replace(space, "").replace(/\//g, ".");
+    }
+
+
+    function throttle(list, action, limit){
+        let i = limit;
+        const actionPromises = [];
+
+        list.slice(0,limit).forEach((item) => {
+            const actionPromise = run(action, item);
+            actionPromises.push(actionPromise)
+        });
+
+        function run(action, item){
+            return action(item).finally(() => {
+                // TODO: Meh, closure variables, could a callback in run, make it possible to pull this out of the closure?
+                i++;
+                if(i < list.length){
+                    run(action, list[i]); 
+                }
+            });
+        }
+
+        return actionPromises;
     }
 }
