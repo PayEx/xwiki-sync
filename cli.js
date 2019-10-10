@@ -175,17 +175,13 @@ function createXwikiHttpService (space, user, password){
         const pages = documents.filter((document) => { return /.md$/.test(document.path); });
         const attachments = documents.filter((document) => { return /.png/.test(document.path); });
 
-        const syncDocumentsPromises = throttle(pages, (document) => {
+        await throttle(pages, (document) => {
             return syncDocument(document);
         }, 5);
 
-        await Promise.all(syncDocumentsPromises);
-
-        const syncAttachmentsPromises = throttle(attachments, (attachment) => {
+        return throttle(attachments, (attachment) => {
             return syncAttachment(attachment);
         }, 5);
-
-        return Promise.all(syncAttachmentsPromises);
     }
 
     async function syncDocument(document){
@@ -352,26 +348,36 @@ function createXwikiHttpService (space, user, password){
         return urlWithoutIndex.replace(space, "").replace(/\//g, ".");
     }
 
-
     function throttle(list, action, limit){
         let i = limit;
-        const actionPromises = [];
+        const proxyPromises = [];
+        const resolvables = []
+        list.forEach((item) => {
+            const proxyPromise = new Promise((resolve) => {
+                resolvables.push({
+                    item,
+                    resolve
+                });
+            });
 
-        list.slice(0,limit).forEach((item) => {
-            const actionPromise = run(action, item);
-            actionPromises.push(actionPromise)
+            proxyPromises.push(proxyPromise);
         });
 
-        function run(action, item){
-            return action(item).finally(() => {
-                // TODO: Meh, closure variables, could a callback in run, make it possible to pull this out of the closure?
-                i++;
+        resolvables.slice(0,i).forEach((resolvable) => {
+            run(resolvable);
+        });
+
+        function run(resolvable){    
+            action(resolvable.item).then(() => {
                 if(i < list.length){
-                    run(action, list[i]); 
+                    run(resolvables[i]);
+                    i++;
                 }
+
+                resolvable.resolve();
             });
         }
 
-        return actionPromises;
+        return Promise.all(proxyPromises);
     }
 }
