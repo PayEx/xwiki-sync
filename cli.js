@@ -179,9 +179,11 @@ function createXwikiHttpService (space, user, password){
             return syncDocument(document);
         }, 5);
 
+        // XWiki returns 500 if we post multiple attachements on the same page at the same time
+        // TODO: Create function that prevents attachments on the same parent at the same time
         return throttle(attachments, (attachment) => {
             return syncAttachment(attachment);
-        }, 5);
+        }, 1);
     }
 
     async function syncDocument(document){
