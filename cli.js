@@ -204,7 +204,7 @@ function createXwikiHttpService (space, user, password){
         }
 
         // TODO: What about external links without http in their urls
-        const contentAsXwikiMarkdown = document.content.replace(/!?\[(.*?)\]\(((?!http)\S*)\)/g, function(match, label, url){
+        const contentAsXwikiMarkdown = document.content.replace(/!?\[(.*?)\]\(((?!http)[\w\/\-\._]+)\)/g, function(match, label, url){
 
             if(match.startsWith("!")){
                 return `![[${label}|${url}]]`;

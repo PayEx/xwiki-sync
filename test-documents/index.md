@@ -8,6 +8,9 @@
 ## Multiple links on the same line
 [Foo](/myroot/foo.md) - [Bar](/myroot/bar.md) <br>
 
+## Links inside parentheses
+Some generic variable (also known as [Foo](/myroot/foo.md))<br>
+
 ## External links
 [Wikipedia](https://en.wikipedia.org)
 
